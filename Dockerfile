@@ -188,6 +188,36 @@ RUN wget -O dotnet.tar.gz https://download.visualstudio.microsoft.com/download/p
     && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
     && dotnet help
 
+
+# Install haskell
+ARG RESOLVER=lts-17.4
+
+RUN set -eux \
+    && cd /tmp \
+    && apt-get update \
+    && apt-get -y --no-install-recommends install libtinfo-dev libzmq3-dev libcairo2-dev libpango1.0-dev libmagic-dev libblas-dev liblapack-dev libgmp-dev \
+    && curl -sSL https://get.haskellstack.org/ | sh \
+    && mkdir -p ${HOME}/ihaskell \
+    && git clone https://github.com/gibiansky/IHaskell \
+    && cd ${HOME}/ihaskell \
+    && (cd /tmp/IHaskell; tar cf - stack.yaml ihaskell.cabal ipython-kernel ghc-parser ihaskell-display) | (cd ${HOME}/ihaskell && tar xf -) \
+    && stack setup \
+    && stack build --only-snapshot \
+    && (cd /tmp/IHaskell; tar cf - src html main LICENSE) | (cd ${HOME}/ihaskell && tar xf -) \
+    && stack build && stack install \
+    && mkdir -p ${HOME}/.stack/global-project \
+    && echo "packages: []\nresolver: ${RESOLVER}\n" > ${HOME}/.stack/global-project/stack.yaml \
+    && stack path --local-install-root \
+    && stack path --snapshot-install-root \
+    && stack path --compiler-bin \
+    && cd /tmp \
+    && rm -rf /tmp/IHaskell
+
+ENV PATH $(stack path --local-install-root)/bin:$(stack path --snapshot-install-root)/bin:$(stack path --compiler-bin):/root/.local/bin:${PATH}
+RUN ihaskell install --stack && \
+    jupyter labextension install jupyterlab-ihaskell
+
+
 # ↓ 削除系ははまとめてここでやる    
 RUN conda clean --all \
     && apt-get clean \
